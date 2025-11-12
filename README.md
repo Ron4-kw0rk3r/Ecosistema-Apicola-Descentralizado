@@ -1,305 +1,508 @@
-![banner](./imagenes/banner.jpg)
-# WayLearn Sui Bootcamp: Tutorial para despliegue en mainnet y creación de MVR
+# Apiario Virtual - Ecosistema Apicola Descentralizado
 
-Sui es una plataforma de blockchain y contratos inteligentes de capa 1 diseñada para que la propiedad de activos digitales sea rápida, privada, segura y accesible.
+## Vision del Sistema
 
-Move es un lenguaje de código abierto para escribir paquetes seguros para manipular objetos en blockchain. Permite bibliotecas, herramientas y comunidades de desarrolladores comunes en blockchains con modelos de datos y ejecución muy diferentes.
+Plataforma blockchain para gestion integral de operaciones apicolas. Modela ciclo completo desde instalacion de colmenas hasta comercializacion de miel. Implementa tracking de salud de abejas, metricas de produccion, y registro de cosechas con trazabilidad.
 
-## Proyecto base
+## Modelado de Entidades
 
-Puedes usar este repositorio como tu punto de despliegue de tu proyecto backend.
+### Apiario - Hub Central
 
-### Abriendo con Codespaces
+Contenedor compartido de toda la operacion apicola:
 
-* Asegúrate de clonar este repositorio a tu cuenta usando el botón **`Fork`**.
-    
-    ![fork](./imagenes/fork.png)
-    * Recuerda renombrar el repositorio a lo que sea que se ajuste con tu proyecto.
-* Presiona el botón **`<> Code`** y luego haz click en la sección **`Codespaces`**
+**Componentes estructurales**:
+- Identificador unico del apiario
+- Address del apicultor propietario
+- Tabla de colmenas indexadas
+- Tabla de cosechas historicas
+- Contadores autoincrementales
 
-    ![codespaces](./imagenes/codespaces.png)
+**Modelo de acceso**:
+- Shared object (acceso publico para consulta)
+- Operaciones restringidas solo a apicultor
+- Persistencia permanente on-chain
 
-* Por último, presiona **`Create codespace on master`**. Esto abrirá el proyecto en una interfaz gráfica de Visual Studio Code e instalará todas las herramientas necesarias para desarrollar con Move.
+### Colmena - Unidad de Produccion
 
-# Puedes saltarte hasta el fondeo de la cuenta. 
-## No es necesario hacer esta parte ya que se hace automaticamente al abrir el codespaces, pero igual te dejamos el procedimiento por si quieres repetirlo en otro entorno: 
-## Configuración inicial para despliegue en testnet 
+Representacion de colonia de abejas con metricas biologicas:
 
-Puedes hacer esto ejecutando los siguientes comandos en tu terminal:
-```sh
-sui client
+```move
+Colmena {
+    id: u64,
+    ubicacion: String,
+    poblacion_abejas: u64,
+    salud_reina: u8,
+    produccion_diaria: u64,
+    temperatura: u64,
+    activa: bool,
+    dias_activos: u64
+}
 ```
 
-La primera vez que ejecutemos esto obtendremos el siguiente mensaje:
+**Parametros clave**:
 
-```sh
-Config file ["<PATH-TO-FILE>/client.yaml"] doesn't exist, do you want to connect to a Sui Full node server [y/N]?
+- `ubicacion`: Descripcion geografica del emplazamiento
+- `poblacion_abejas`: Numero estimado de individuos en la colonia
+- `salud_reina`: Estado de la abeja reina (0-100 scale)
+- `produccion_diaria`: Gramos de miel por dia (calculado automaticamente)
+- `temperatura`: Grados Celsius dentro de la colmena
+- `activa`: Flag de operacion (permite/bloquea cosechas)
+- `dias_activos`: Contador de longevidad de la colmena
+
+**Formula de produccion**:
+```
+produccion_diaria = poblacion_abejas / 1000
 ```
 
-Presionamos y y luego Enter para continuar y obtendremos esto:
-```sh
-Sui Full node server URL (Defaults to Sui Testnet if not specified) :
+Ejemplo:
+- 50,000 abejas → 50 gramos/dia
+- 100,000 abejas → 100 gramos/dia
+
+### Cosecha - Registro de Extraccion
+
+Documentacion de recoleccion de miel con metadatos de calidad:
+
+**Atributos**:
+- ID unico de cosecha
+- Referencia a colmena origen
+- Cantidad en kilogramos
+- Nivel de calidad (0-100)
+- Timestamp de extraccion
+- Tipo de flora predominante
+- Estado de comercializacion
+
+**Trazabilidad**: Vincula producto final con colmena especifica
+
+## Operaciones del Sistema
+
+### crear_apiario
+
+Establecimiento del hub apicola
+
+**Proceso de creacion**:
+1. Instanciar estructura Apiario
+2. Registrar apicultor como propietario
+3. Inicializar tablas vacias
+4. Compartir objeto publicamente
+
+**Caracteristica distintiva**: Share object vs owned (permite consultas publicas de produccion)
+
+**Setup inicial**:
+```bash
+sui client call \
+  --package $PACKAGE_ID \
+  --module apiario_virtual \
+  --function crear_apiario \
+  --gas-budget 15000000
 ```
 
-Puedes volver a presionar `Enter` en tu teclado para dejar la configuración por defecto, en este caso nos estaríamos conectando a la `testnet`, es decir, a la red de pruebas de Sui. El siguiente mensaje en terminal debería ser algo como:
+**Resultado**: Apiario compartido listo para instalar colmenas
 
-```sh
-Select key scheme to generate keypair (0 for ed25519, 1 for secp256k1, 2 for secp256r1):
-```
-Puedes seleccionar el que gustes, la opción por defecto es 0, así que escribe `0` en y presiona `Enter`. Una vez terminado deberías obtener algo similar a esto:
+### instalar_colmena
 
-```sh
-Generated new keypair for address with scheme "ed25519" [0xb9c83a8b40d3263c9ba40d551514fbac1f8c12e98a4005a0dac072d3549c2442]
-Secret Recovery Phrase : [cap wheat many line human lazy few solid bored proud speed grocery]
-```
-> :information_source: Tanto el `address` como la frase de recuperación que obtengas serán diferentes a las que mostramos aquí.
+Incorporacion de nueva unidad productiva
 
+**Parametros de instalacion**:
+- `ubicacion`: Descripcion textual del lugar
+- `poblacion`: Numero inicial de abejas
 
-## Fondeando una cuenta
+**Logica de inicializacion**:
+1. Validar autorizacion del apicultor
+2. Crear estructura Colmena con ID del contador
+3. Convertir ubicacion a String
+4. Establecer poblacion inicial
+5. Inicializar salud_reina al maximo (100)
+6. Calcular produccion_diaria automaticamente
+7. Setear temperatura estandar (35°C)
+8. Marcar como activa
+9. Dias activos en cero
+10. Insertar en tabla
+11. Incrementar contador
 
-Una vez conectado, el siguiente paso es **fondear tu cuenta**, es decir, asegurarte de que la dirección que estás utilizando tenga **tokens SUI** (aunque sean tokens de prueba) suficientes para cubrir las tarifas de las transacciones. Este proceso es esencial para poder desplegar paquetes, ejecutar funciones y validar tu lógica en cualquier red que estés utilizando.
+**Calculos automaticos**:
+- `produccion_diaria = poblacion / 1000`
+- `salud_reina = 100` (nueva reina)
+- `temperatura = 35` (optima para abejas)
 
-Puedes hacer esto ejecutando el siguiente comando en tu terminal:
-
-```sh
-sui client faucet
-```
-
-Obtendrás algo similar a esto, probablemente en letras rojas:
-
-```sh
-For testnet tokens, please use the Web UI: https://faucet.sui.io/?address=0x451ef911c5a1706d4833f89b75f6cb49c55a586821e9b7de6bd9d8b41dac2cda
-```
-Puedes hacer click en esa URL, la cual te llevará al faucet de Sui, que es una aplicación que reparte tokens de prueba en las redes `testnet` y `devnet`, para que los desarrolladores puedan desplegar y probar sus paquetes Move.
-
-![faucet](imagenes/testnetfaucet.png)
-
-Ya en el sitio, simplemente haz click en **Request Testnet SUI**. Con esto habremos terminado el proceso de fondeo. Puedes verificarlo en terminal
-
-```sh
-sui client balance
-╭────────────────────────────────────────╮
-│ Balance of coins owned by this address │
-├────────────────────────────────────────┤
-│ ╭──────────────────────────────────╮   │
-│ │ coin  balance (raw)  balance     │   │
-│ ├──────────────────────────────────┤   │
-│ │ Sui   10000000000    10.00 SUI   │   │
-│ ╰──────────────────────────────────╯ │
-╰────────────────────────────────────────╯
+**Instalar colmena grande**:
+```bash
+sui client call \
+  --package $PKG \
+  --module apiario_virtual \
+  --function instalar_colmena \
+  --args $APIARIO_ID \
+    \"Valle Norte - Sector A\" \
+    80000 \
+  --gas-budget 12000000
 ```
 
-> :information_source: El README distorsiona un poco este output.
-
-Puedes acceder al faucet directamente desde acá: https://faucet.sui.io/
-
-## Desplegando en la testnet
-La testnet es un entorno de pruebas creado para que los desarrolladores de la blockchain Sui experimenten e interactuen con sus paquetes antes de subirlos de manera oficial a la Mainnet, la red real. 
-
-Una vez recibidos los tokens de testnet mediante el faucet, desplegar a la testnet es muy sencillo, solo es necesario ejecutar el comando:
-```
-sui client publish
-```
-
-Lo que dará como resultado mucha informacion relacionada con la transaccion. Sin embargo, la información en la que nos vamos a centrar es la siguiente: 
-
-```
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Object Changes                                                                                   │
-├──────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ Created Objects:                                                                                 │
-│  ┌──                                                                                             │
-│  │ ObjectID: 0xeee71d904b4ba170d130dacdaf5de7eabd23a6d3634fd39e06ceb6e2e630522b                  │
-│  │ Sender: 0xfdfb28de3b66e3d21922ed3a1f13cb99b5c7d848264fab94358d17e76647b6a0                    │
-│  │ Owner: Account Address ( 0xfdfb28de3b66e3d21922ed3a1f13cb99b5c7d848264fab94358d17e76647b6a0 ) │
-│  │ ObjectType: 0x2::package::UpgradeCap                                                          │
-│  │ Version: 349180416                                                                            │
-│  │ Digest: HuYaAgoVDsdbt3skuHzBgstvupEqL6AjEURbPgjb86sn                                          │
-│  └──                                                                                             │
-│ Mutated Objects:                                                                                 │
-│  ┌──                                                                                             │
-│  │ ObjectID: 0x12b4b6e610179a45e4e5824a5189b73bbd88d37adc8e91988ce343689172ba45                  │
-│  │ Sender: 0xfdfb28de3b66e3d21922ed3a1f13cb99b5c7d848264fab94358d17e76647b6a0                    │
-│  │ Owner: Account Address ( 0xfdfb28de3b66e3d21922ed3a1f13cb99b5c7d848264fab94358d17e76647b6a0 ) │
-│  │ ObjectType: 0x2::coin::Coin<0x2::sui::SUI>                                                    │
-│  │ Version: 349180416                                                                            │
-│  │ Digest: 9pvSJgWuu2Ki7qz5ZKRiarP7XwEHSkXYBnj5RGrPkkF6                                          │
-│  └──                                                                                             │
-│ Published Objects:                                                                               │
-│  ┌──                                                                                             │
-│  │ PackageID: 0x8ddace66e376f03067016c51820d512fa1a8fa9e2e518ed0c842086cdb27ae91                 │
-│  │ Version: 1                                                                                    │
-│  │ Digest: 71yxJBgson9NHunqDvmKiuM5XVfsaszxwhdnXCPTsbeX                                          │
-│  │ Modules: empresa                                                                              │
-│  └──                                                                                             │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+**Instalar colmena pequeña**:
+```bash
+sui client call \
+  --package $PKG \
+  --module apiario_virtual \
+  --function instalar_colmena \
+  --args $APIARIO_ID \
+    \"Cerro Sur - Zona B\" \
+    30000 \
+  --gas-budget 12000000
 ```
 
-Donde al final se muestra el PackageID, o ID del paquete (nuestro código). Es importante guardar este ID, ya que mediante su uso es como haremos interaccion con nuestro nuestro codigo y sus funciones.
+**Tamaños tipicos de colmenas**:
+- Pequeña: 20,000-40,000 abejas → 20-40g/dia
+- Mediana: 40,000-60,000 abejas → 40-60g/dia
+- Grande: 60,000-100,000 abejas → 60-100g/dia
 
-## Verificando nuestro paquete en Suiscan
-Suiscan es una plataforma de exploración y análisis. Sirve como una herramienta integral para que los desarrolladores naveguen y analicen datos on-chain, proporcionando información detallada sobre transacciones, direcciones, actividad de la red y diversos componentes del ecosistema.
+### actualizar_colmena
 
-![alt text](/imagenes/suiscan.png)
-https://suiscan.xyz/testnet/home
+Actualizacion de parametros biologicos
 
+**Parametros modificables**:
+- `nueva_poblacion`: Conteo actualizado de abejas
+- `nueva_temp`: Temperatura actual en °C
 
-Para localizar nuestro paquete solo es necesario verificar que nos encontramos en testnet (que se ve en la parte superior derecha) e introduciremos en el buscador el ID del paquete que nos arrojo la terminal una vez finalizado el despliegue. 
+**Efectos secundarios**:
+- Recalcula produccion_diaria automaticamente
+- Incrementa contador dias_activos
 
-Posterior a eso, daremos click en la única opción que nos aparece:
+**Proceso de actualizacion**:
+1. Verificar permisos de apicultor
+2. Obtener referencia mutable a colmena
+3. Actualizar poblacion
+4. Actualizar temperatura
+5. Recalcular produccion (nueva_poblacion / 1000)
+6. Incrementar dias activos
 
-![alt text](imagenes/paquete.png)
+**Uso tipico**: Monitoreo periodico (semanal/mensual) de estado de colmena
 
-Como resultado veremos la siguiente pestaña, donde veremos un resumen de las transacciones realizadas con nuestro paquete. De igual manera, en el apartado contracts es posible visualizar el código desplegado.
+**Actualizar tras inspeccion**:
+```bash
+COLMENA_ID=0
+NUEVA_POBLACION=75000  # Crecimiento de la colonia
+NUEVA_TEMP=34  # Temperatura medida
 
-![alt text](imagenes/bloque.png)
-
-## Despliegue en mainnet 
-### Cambiando de entorno 
-
-El primer paso para el despligue en mainnet es especificar la red en la que ahora queremos trabajar, para ello es necesario ejecutar los siguientes comandos:
-
-(SALTARSE AL SIGUIENTE COMANDO; No es necesario agregarlo, ya que se agrega automaticamente al inicializar el codespaces).
-```sh
-sui client new-env --alias mainnet --rpc https://fullnode.mainnet.sui.io:443
+sui client call \
+  --package $PKG \
+  --module apiario_virtual \
+  --function actualizar_colmena \
+  --args $APIARIO $COLMENA_ID $NUEVA_POBLACION $NUEVA_TEMP \
+  --gas-budget 10000000
 ```
 
-Ahora, necesitamos cambiarnos a este ambiente. Hazlo de la siguiente manera:
-```sh
-sui client switch --env mainnet 
+**Actualizar tras perdidas**:
+```bash
+# Colmena afectada por clima
+NUEVA_POBLACION=45000  # Reduccion poblacional
+NUEVA_TEMP=32  # Temperatura baja
+
+sui client call \
+  --package $PKG \
+  --module apiario_virtual \
+  --function actualizar_colmena \
+  --args $APIARIO $COLMENA_ID $NUEVA_POBLACION $NUEVA_TEMP
 ```
 
-Puedes consultar tu dirección activa usando [Esta es la address que debes compartir en el registro de solicitud de tokens]:
-```sh
-sui client active-address
+**Rangos saludables**:
+- Temperatura: 33-37°C (optimo 35°C)
+- Poblacion: 20,000+ abejas (minimo viable)
+
+### cosechar_miel
+
+Extraccion y registro de produccion
+
+**Parametros de cosecha**:
+- `id_colmena`: Colmena origen de la miel
+- `kilos`: Cantidad extraida
+- `calidad`: Score 0-100
+- `tipo_flor`: Flora predominante
+
+**Validaciones**:
+1. Verificar autorizacion de apicultor (error 1)
+2. Comprobar que colmena este activa (error 2)
+
+**Proceso de registro**:
+1. Obtener referencia a colmena
+2. Validar estado activo
+3. Crear estructura Cosecha
+4. Asignar ID autoincremental
+5. Vincular con ID de colmena
+6. Registrar cantidad en kilos
+7. Almacenar calidad
+8. Fecha en 0 (placeholder - podria usar Clock)
+9. Convertir tipo_flor a String
+10. Marcar como no vendida
+11. Insertar en tabla de cosechas
+12. Incrementar contador
+
+**Cosechar miel de azahar**:
+```bash
+COLMENA_ID=0
+KILOS=12
+CALIDAD=95
+TIPO_FLOR="Azahar"
+
+sui client call \
+  --package $PKG \
+  --module apiario_virtual \
+  --function cosechar_miel \
+  --args $APIARIO $COLMENA_ID $KILOS $CALIDAD \"$TIPO_FLOR\" \
+  --gas-budget 12000000
 ```
 
-Y tu balance usando:
-```sh
-sui client balance
+**Cosechar miel multifloral**:
+```bash
+sui client call \
+  --package $PKG \
+  --module apiario_virtual \
+  --function cosechar_miel \
+  --args $APIARIO 1 8 85 \"Multifloral\" \
+  --gas-budget 12000000
 ```
 
-## Despliegue
-De igual manera que en el despliegue en testnet, solo es necesario ejecutar el comando 
+**Tipos de miel comunes**:
+- Azahar: Alta calidad (90-100)
+- Romero: Calidad media-alta (80-90)
+- Multifloral: Calidad variable (70-85)
+- Bosque: Calidad media (75-85)
 
+**Escala de calidad**:
 ```
-sui client publish
-```
-Lo que dara como resultado, entre otras cosas:
-
-```
-│ Published Objects:                                                                               │
-│  ┌──                                                                                             │
-│  │ PackageID: 0x41c0712233a64af3b69dd5f2a557b3a05f4dabdaba0300880e130d59381be03f                 │
-│  │ Version: 1                                                                                    │
-│  │ Digest: ASwdkEcAfKuYgAprofprLDLJnz7DNfNDtUTTPAKUd41x                                          │
-│  │ Modules: empresa                                                                              │
-│  └──                                                                                             │
-```
-Puedes revisar tu paquete mediante el PackageID en suiscan para verificar que el codigo es el mismo al que desarrollaste, ver detalles del despliegue, entre otras cosas.
-
-## Creacion del Move Registry
-### Importacion de la llave privada
-En este paso es necesario exportar la llave privada del address utilizado para el despliegue del paquete en mainnet, suena complejo, pero en realidad es bastante sencillo. El primer paso apra lograrlo correr el comando:
-
-```
-sui keytool export --key-identity <Inserta tu address aqui>
-```
-Recuerda que puedes consultar tu address con:
-```
-sui client active-address
+90-100: Premium (exportacion)
+80-89:  Alta (comercio especializado)
+70-79:  Buena (consumo local)
+60-69:  Regular (procesamiento)
+<60:    Baja (descarte/uso industrial)
 ```
 
-Por ejemplo:
+### vender_cosecha
 
+Marcado de comercializacion
+
+**Funcionalidad**:
+- Cambia flag `vendida` a true
+- Registra que cosecha fue vendida
+- No elimina registro (trazabilidad)
+
+**Limitaciones**:
+- No maneja pagos on-chain
+- No valida precio
+- No registra comprador
+- Solo marca estado
+
+**Marcar como vendida**:
+```bash
+COSECHA_ID=0
+
+sui client call \
+  --package $PKG \
+  --module apiario_virtual \
+  --function vender_cosecha \
+  --args $APIARIO $COSECHA_ID \
+  --gas-budget 7000000
 ```
-sui keytool export --key-identity 0xfdfb28de3b66e3d21922ed3a1f13cb99b5c7d848264fab94358d17e76647b6a0
+
+**Uso en workflow completo**:
+```bash
+# 1. Cosechar
+sui client call --package $PKG --module apiario_virtual \
+  --function cosechar_miel --args $APIARIO 0 10 92 "Lavanda"
+
+# 2. Esperar venta off-chain
+# ... negociacion, pago fiat/crypto ...
+
+# 3. Marcar como vendida
+sui client call --package $PKG --module apiario_virtual \
+  --function vender_cosecha --args $APIARIO 0
 ```
 
-lo que dará como resultado la siguiente informacion:
+## Ciclos Operacionales Completos
+
+### Caso 1: Iniciar Operacion Apicola
+
+**Setup completo de apiario**:
+
+```bash
+# Desplegar contrato
+sui client publish --gas-budget 100000000
+export PKG=<package_id>
+
+# Crear apiario
+sui client call --package $PKG --module apiario_virtual --function crear_apiario
+export APIARIO=<apiario_id>
+
+# Instalar primera colmena
+sui client call --package $PKG --module apiario_virtual \
+  --function instalar_colmena \
+  --args $APIARIO "Monte Verde - Parcela 1" 50000
+
+# Instalar segunda colmena
+sui client call --package $PKG --module apiario_virtual \
+  --function instalar_colmena \
+  --args $APIARIO "Monte Verde - Parcela 2" 45000
+
+# Instalar tercera colmena
+sui client call --package $PKG --module apiario_virtual \
+  --function instalar_colmena \
+  --args $APIARIO "Valle Bajo - Sector A" 60000
 ```
-╭────────────────────┬────────────────────────────────────────────────────────────────────────────────────────────╮
-│ exportedPrivateKey │  suiprivkey1qz72l.......                                                                   │
-│ key                │ ╭─────────────────┬──────────────────────────────────────────────────────────────────────╮ │
-│                    │ │ alias           │                                                                      │ │
-│                    │ │ suiAddress      │  0xfdfb28de3b66e3d21922ed3a1f13cb99b5c7d848264fab94358d17e76647b6a0  │ │
-│                    │ │ publicBase64Key │  ACp+9/7QpKjAx29svnrX+....                                           │ │
-│                    │ │ keyScheme       │  ed25519                                                             │ │
-│                    │ │ flag            │  0                                                                   │ │
-│                    │ │ peerId          │  2a7ef7fed0a4a8c0c76f6cbe7ad7fac6f71f60....                          │ │
-│                    │ ╰─────────────────┴──────────────────────────────────────────────────────────────────────╯ │
-╰────────────────────┴────────────────────────────────────────────────────────────────────────────────────────────╯
+
+### Caso 2: Monitoreo Mensual
+
+**Actualizacion regular de colmenas**:
+
+```bash
+#!/bin/bash
+
+# Mes 1: Inspeccion de colmenas
+# Colmena 0: Crecimiento estable
+sui client call --package $PKG --module apiario_virtual \
+  --function actualizar_colmena --args $APIARIO 0 55000 35
+
+# Colmena 1: Crecimiento moderado
+sui client call --package $PKG --module apiario_virtual \
+  --function actualizar_colmena --args $APIARIO 1 48000 34
+
+# Colmena 2: Excelente crecimiento
+sui client call --package $PKG --module apiario_virtual \
+  --function actualizar_colmena --args $APIARIO 2 70000 36
 ```
 
-Vamos a copiar todo lo que aparece en la primera linea: suiprivkey1qz72l...
+### Caso 3: Temporada de Cosecha
 
-Posteriormente, crearemos una nueva cuenta en la Wallet de Slush, si aun no tienes la tuya puedes acceder desde el navegador o instalando la extencion, desde el siguiente enlace: https://slush.app/
+**Ciclo completo de extraccion**:
 
-![alt text](/imagenes/slush.png)
+```bash
+# Primavera: Cosecha de Azahar
+# Colmena 0: 15 kilos calidad premium
+sui client call --package $PKG --module apiario_virtual \
+  --function cosechar_miel --args $APIARIO 0 15 96 "Azahar"
 
-Una vez en el apartado de agregar cuenta, seleccionaremos la opcion Import Private Key (importar llave privada), donde pegaremos la informacion copiada de la terminal. 
+# Colmena 1: 12 kilos calidad alta
+sui client call --package $PKG --module apiario_virtual \
+  --function cosechar_miel --args $APIARIO 1 12 92 "Azahar"
 
-![alt text](imagenes/import.png)
+# Colmena 2: 18 kilos calidad premium
+sui client call --package $PKG --module apiario_virtual \
+  --function cosechar_miel --args $APIARIO 2 18 98 "Azahar"
 
-Y listo!!!, ahora deberia aparecer tu direccion de la siguiente manera:
+# Verano: Cosecha de Romero
+sui client call --package $PKG --module apiario_virtual \
+  --function cosechar_miel --args $APIARIO 0 10 88 "Romero"
 
-![alt text](imagenes/imported.png)
+sui client call --package $PKG --module apiario_virtual \
+  --function cosechar_miel --args $APIARIO 1 9 85 "Romero"
 
-### Creacion del MVR
-Abriremos el siguiente enlace, lo que nos direccionara a la pagina para la creacion del MVR: https://www.moveregistry.com/
-![alt text](imagenes/mvr.png)
+sui client call --package $PKG --module apiario_virtual \
+  --function cosechar_miel --args $APIARIO 2 14 90 "Romero"
+```
 
-En la parte superior izquierda vemos la opcion que dice "Connect", donde daremos click para vincular nuestra Wallet de Slush con MVR, **En caso de tener mas de dos direcciones, verifica que sea la misma en la que desplegaste tu proyecto en mainnet**. Finalmente, es necesario presionar el boton Approve.
+### Caso 4: Comercializacion
 
+**Registro de ventas**:
 
-Una vez vinculada la Wallet de Slush, se nos habilitaran dos opciones. De momento, daremos click donde dice **My Packages**, despues, en el buscador que dice **Select one**, donde seleccionaremos la unica opcion que aparece  **Public Name**.
+```bash
+# Vender cosecha premium de azahar (ID 0)
+sui client call --package $PKG --module apiario_virtual \
+  --function vender_cosecha --args $APIARIO 0
 
-![alt text](imagenes/packages.png)
+# Vender segunda cosecha de azahar (ID 1)
+sui client call --package $PKG --module apiario_virtual \
+  --function vender_cosecha --args $APIARIO 1
 
-Ahora daremos click en  **Add package**
+# Vender tercera cosecha de azahar (ID 2)
+sui client call --package $PKG --module apiario_virtual \
+  --function vender_cosecha --args $APIARIO 2
 
-![alt text](imagenes/create.png)
+# Cosechas de romero aun en inventario
+```
 
-Lo que nos abrira el siguiente formulario donde debemos de poner de manera obligatoria el nombre. De igual manera, es recomendable llenar la segunda casilla con una breve descripcion del proyecto, todas las demas secciones son opcionales. 
+## Detalles Tecnicos
 
-![alt text](imagenes/package-details.png)
+**Calculo de Produccion**:
+- Formula simple: poblacion / 1000
+- Actualizacion automatica al cambiar poblacion
+- No considera factores externos (clima, flores)
 
-Al terminar, nos desplazaremos hasta la parte inferior para presionar el boton **Create**, lo que nos abrira la extension de Slush que nos solicitara la aprovacion de la creacion.
+**Salud de Reina**:
+- Inicializada en 100 (optima)
+- No hay funcion de actualizacion
+- Limitacion: no modela degradacion
 
-![alt text](imagenes/approve-creation.png)
+**Temperatura**:
+- Inicializada en 35°C (optima)
+- Actualizable via actualizar_colmena
+- No hay validacion de rango
 
-Una vez creado, nos redireccionara a la pestaña anterior, donde ahora seleccionaremos la opcion **My Metadata** y posteiormente **Create New Metadata**
+**Estado Activa**:
+- Inicializada en true
+- No hay funcion para desactivar
+- Bloquea cosechas si es false (error 2)
 
-![alt text](/imagenes/metadata.png)
+**Dias Activos**:
+- Contador de longevidad
+- Incrementa con cada actualizacion
+- No esta vinculado a tiempo real
 
-Seleccionamos la unica opcion que aparece y presionamos siguiente. **La ID que se muestra es la ID del objeto, no la ID del paquete**
+**Control de Acceso**:
+- Todas las operaciones requieren ser apicultor
+- Error 1 si no autorizado
+- Solo cosechar_miel valida estado activo (error 2)
 
-![alt text](/imagenes/step1.png)
+**Trazabilidad**:
+- Cosecha vincula a colmena origen
+- No se eliminan registros
+- Permite audit trail completo
 
-Personalizamos la informacion de la metadata, **Se recomienda que la etiqueta sea acorde al nombre del proyecto**
+## Limitaciones y Extensiones
 
-![alt text](/imagenes/step2.png)
+**Limitaciones actuales**:
+1. No hay funcion de desactivar colmena
+2. Salud de reina no actualizable
+3. Fecha de cosecha placeholder (no usa Clock)
+4. No hay validacion de rangos de temperatura
+5. No hay gestion de pagos por ventas
+6. No registra comprador en venta
+7. No modela factores climaticos
 
-Una vez completada la personalizacion, damos en **Create**, de nueva cuenta abrira la extension de Slush para autorizar la creacion de la metadata, donde solo daremos click en Approve.
+**Extensiones propuestas**:
+- Integracion con Clock para timestamps reales
+- Sistema de alertas por temperatura critica
+- Tracking de tratamientos sanitarios
+- Metricas de productividad por temporada
+- Marketplace integrado para ventas
+- NFTs de certificacion de calidad
+- Analisis de tendencias de produccion
 
-![alt text](/imagenes/approve2.png)
+## Testing
 
-Ya creada la metadata, nos regresamos a la pagina anterior, donde seleccionaremos el paquete creado anteriormente (1), bajaremos hasta la parte inferior (2) y seleccionaremos la metadata creada (3)
+```bash
+sui move test
+```
 
-![alt text](/imagenes/package-metadata.png)
+## Deployment
 
-Una vez hecho esto, aparecera un recuadro que nos pide confirmar que entendemos que esta accion es irreversible (1). Por ultimo, damos click en **Save Changes** (2), se abrira la extension de Slush donde es necesario aprovar la transaccion (3).
+```bash
+sui client publish --gas-budget 100000000
+```
 
-![alt text](imagenes/create-metadata.png)
+## Aplicaciones Reales
 
-Y listo!, eso es todo. Puedes corrobarar la creacion de tu MVR en el buscador de la parte superior:
+**Apicultura Comercial**:
+- Gestion de multiples apiarios
+- Tracking de productividad
+- Certificacion de origen
 
-![alt text](imagenes/image.png)
+**Cooperativas**:
+- Transparencia en produccion
+- Trazabilidad para exportacion
+- Auditoria descentralizada
 
-Lo que nos llevara a una pagina similar a esta: https://www.moveregistry.com/package/@pkg/mi-empresa, que es similar a la que debes de compartir en el formulario de entrega de proyecto.
+**Investigacion**:
+- Datos de salud de colmenas
+- Estudios de productividad
+- Impacto de factores ambientales
 
-![alt text](/imagenes/image-1.png)
-
-## Formulario de entrega
-https://airtable.com/appSMP6mbcQoLiIEu/pagGANiEIaqdcrtdc/form
-> Este repositorio fue creado con base al sui-starter-kit de ZinHunter: https://github.com/WayLearnLatam/sui-starter-kit
+**Consumidores**:
+- Verificacion de origen
+- Garantia de calidad
+- Trazabilidad del producto
